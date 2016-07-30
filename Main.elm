@@ -277,7 +277,7 @@ makeHeader : Html Msg
 makeHeader =
     header []
         [ div [ class "title" ]
-            [ h2 [] [ text "Work Relax Timer" ]
+            [ h2 [] [ text "Focus Optimizer" ]
             ]
         ]
 
