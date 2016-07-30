@@ -27,7 +27,17 @@ type alias Model =
     , timerMode : Mode
     , seconds : Int
     , pomsCompleted : Int
+    , chilloutMode : Bool
     }
+
+
+
+-- Number of seconds in chillout mode
+
+
+chilloutLimit : Int
+chilloutLimit =
+    20 * 60
 
 
 
@@ -36,7 +46,7 @@ type alias Model =
 
 relaxLimit : Int
 relaxLimit =
-    300
+    5 * 60
 
 
 
@@ -45,7 +55,7 @@ relaxLimit =
 
 focusLimit : Int
 focusLimit =
-    1500
+    25 * 60
 
 
 
@@ -78,7 +88,7 @@ update msg model =
             )
 
         Clear ->
-            ( model
+            ( { model | timerStatus = Focus }
                 |> stopCounting
                 |> zeroClock
                 |> resetPomsCompleted
@@ -96,15 +106,17 @@ update msg model =
                 ( model.counting
                 , model.timerStatus
                 , (model.seconds == focusLimit)
-                    || (model.seconds == relaxLimit)
+                , (model.seconds == relaxLimit)
+                , (model.seconds == chilloutLimit)
+                , model.chilloutMode
                 )
             of
                 -- Not counting, so do nothing
-                ( False, _, _ ) ->
+                ( False, _, _, _, _, _ ) ->
                     ( model, Cmd.none )
 
                 -- Counting and the clock has struck 25 minutes in Focus
-                ( True, Focus, True ) ->
+                ( True, Focus, True, _, _, _ ) ->
                     ( model
                         |> flipStatus
                         |> zeroClock
@@ -112,7 +124,7 @@ update msg model =
                     )
 
                 -- Counting and clock has struck 5 minutes in Relax
-                ( True, Relax, True ) ->
+                ( True, Relax, _, True, _, False ) ->
                     ( model
                         |> flipStatus
                         |> zeroClock
@@ -120,12 +132,27 @@ update msg model =
                     , Cmd.none
                     )
 
+                -- Exit chilloutMode
+                ( True, Relax, _, _, True, True ) ->
+                    ( model
+                        |> flipStatus
+                        |> zeroClock
+                        |> markPomsCompleted
+                        |> disengageChilloutMode
+                    , Cmd.none
+                    )
+
                 -- Ordinary counting
-                ( True, _, False ) ->
+                ( True, _, _, _, _, _ ) ->
                     ( model
                         |> tickSecond model.seconds
                     , Cmd.none
                     )
+
+
+disengageChilloutMode : Model -> Model
+disengageChilloutMode model =
+    { model | chilloutMode = False }
 
 
 resetPomsCompleted : Model -> Model
@@ -150,12 +177,21 @@ tickSecond s model =
 
 flipStatus : Model -> Model
 flipStatus model =
-    case (model.timerStatus) of
-        Focus ->
+    case ( model.timerStatus, rem model.pomsCompleted 4 == 3 ) of
+        ( Focus, False ) ->
             { model | timerStatus = Relax }
 
-        Relax ->
-            { model | timerStatus = Focus }
+        ( Focus, True ) ->
+            { model
+                | timerStatus = Relax
+                , chilloutMode = True
+            }
+
+        ( Relax, _ ) ->
+            { model
+                | timerStatus = Focus
+                , chilloutMode = False
+            }
 
 
 zeroClock : Model -> Model
@@ -174,13 +210,13 @@ markPomsCompleted model =
 
 view : Model -> Html Msg
 view model =
-    div []
+    div [ class "appWindow" ]
         [ makeHeader
+        , p [ class "counter" ]
+            [ text <| "Routines Completed: " ++ toString model.pomsCompleted ]
         , makeMainPage model
-        , makeFooter
           --- Purely for sanity checking will be removed later
-        , br [] []
-        , p [] [ text <| toString model ]
+        , makeFooter
         ]
 
 
@@ -203,30 +239,39 @@ makeButtonCluster =
 
 makeClock : Model -> Html Msg
 makeClock model =
-    div [ class "bezel" ]
-        [ div [ class "clock" ]
+    div []
+        [ div [ bezelChecker model.timerStatus ]
             [ div [ statusChecker model.timerStatus ]
                 [ text <| toString model.timerStatus
                 ]
-            , div [ class "gauge" ]
+            , div [ gaugeChecker model.timerStatus ]
                 [ text <| timeMaker model
                 ]
+            , bezelButtonMaker "Elapsed" ElapsedMode model
+            , bezelButtonMaker "Remaining" RemainingMode model
             ]
-        , bezelButtonMaker "Elapsed" ElapsedMode model
-        , bezelButtonMaker "Remaining" RemainingMode model
         ]
 
 
 timeMaker : Model -> String
 timeMaker model =
-    case ( model.timerMode, model.timerStatus, model.seconds ) of
-        ( Elapsed, _, s ) ->
+    case
+        ( model.timerMode
+        , model.timerStatus
+        , model.chilloutMode
+        , model.seconds
+        )
+    of
+        ( Elapsed, _, _, s ) ->
             getClockString s
 
-        ( Remaining, Relax, s ) ->
+        ( Remaining, Relax, False, s ) ->
             getClockString <| (relaxLimit - s)
 
-        ( Remaining, Focus, s ) ->
+        ( Remaining, Relax, True, s ) ->
+            getClockString <| (chilloutLimit - s)
+
+        ( Remaining, Focus, _, s ) ->
             getClockString <| (focusLimit - s)
 
 
@@ -248,14 +293,34 @@ getClockString sec =
         formatter madeMinutes ++ " : " ++ formatter madeSeconds
 
 
+bezelChecker : Status -> Html.Attribute Msg
+bezelChecker status =
+    case status of
+        Relax ->
+            class "bezelrelax"
+
+        Focus ->
+            class "bezelfocus"
+
+
 statusChecker : Status -> Html.Attribute Msg
 statusChecker status =
     case status of
         Relax ->
-            class "relaxgauge"
+            class "statusrelax"
 
         Focus ->
-            class "focusgauge"
+            class "statusfocus"
+
+
+gaugeChecker : Status -> Html.Attribute Msg
+gaugeChecker status =
+    case status of
+        Relax ->
+            class "gaugerelax"
+
+        Focus ->
+            class "gaugefocus"
 
 
 bezelButtonMaker : String -> Msg -> Model -> Html Msg
@@ -275,8 +340,8 @@ getBezelBtnClass btnName model =
 
 makeHeader : Html Msg
 makeHeader =
-    header []
-        [ div [ class "title" ]
+    header [ class "full-width-bar" ]
+        [ div []
             [ h2 [] [ text "Focus Optimizer" ]
             ]
         ]
@@ -284,11 +349,12 @@ makeHeader =
 
 makeFooter : Html Msg
 makeFooter =
-    footer []
-        [ div [ class "links" ] [ linkMaker ]
-        , div [ class "logo" ]
-            [ img [ src "Signature.JPG" ] []
+    footer [ class "full-width-bar-bottom" ]
+        [ div [ class "right" ]
+            [ div [] [ linkMaker ]
             ]
+        , div []
+            [ img [ src "Signature.png", class "center-cropped" ] [] ]
         ]
 
 
@@ -323,6 +389,7 @@ init =
       , timerMode = Elapsed
       , seconds = 0
       , pomsCompleted = 0
+      , chilloutMode = False
       }
     , Cmd.none
     )

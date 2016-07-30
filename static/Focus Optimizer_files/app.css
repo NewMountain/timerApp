@@ -46,29 +46,12 @@ h2 {
     font-size: 320%;
 }
 
-.right {
-    position: absolute;
-    right: 0px;
-    top:0px;
-}
-
-.left {
-    position: absolute;
-    left: 0px;
-    top:0px;
-}
-
 .activebezelbtn{
   background-color: darkgrey;
 }
 
 .inactivebezelbtn{
   background-color: lightgrey;
-}
-
-.counter{
-  font-weight: bold;
-  font-size: 18px;
 }
 
 .appWindow{
@@ -155,8 +138,4 @@ h2 {
   font-size: 1750%;
   color: rgb(94,94,38);
   border: 8px grey;
-}
-
-.footerul li{
-  display: inline;
 }
