@@ -12,12 +12,12 @@ html {
 
 body {
   margin: 100px;
-  background-image: url("body.png");
+  background-image: url("static/body.png");
   background-repeat: repeat;
 }
 
 footer {
-  background-image: url("footer.png");
+  background-image: url("static/footer.png");
   background-repeat: repeat;
 
   width: 100%;
@@ -32,7 +32,7 @@ header{
   padding: 0px;
   height: 90px;
 
-  background-image: url("header.png");
+  background-image: url("static/header.png");
   background-repeat: repeat;
   vertical-align: top;
 }

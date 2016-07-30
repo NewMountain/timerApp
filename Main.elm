@@ -359,7 +359,7 @@ makeFooter =
             [ div [] [ linkMaker ]
             ]
         , div []
-            [ img [ src "Signature.png", class "center-cropped" ] [] ]
+            [ img [ src "static/Signature.png", class "center-cropped" ] [] ]
         ]
 
 
