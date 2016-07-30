@@ -177,7 +177,12 @@ tickSecond s model =
 
 flipStatus : Model -> Model
 flipStatus model =
-    case ( model.timerStatus, rem model.pomsCompleted 4 == 3 ) of
+    case
+        ( model.timerStatus
+        , (rem model.pomsCompleted 4 == 0)
+            && (model.pomsCompleted > 0)
+        )
+    of
         ( Focus, False ) ->
             { model | timerStatus = Relax }
 
