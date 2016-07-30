@@ -2,8 +2,10 @@ module Main exposing (..)
 
 import Html exposing (..)
 import Html.App as App
-import Html.Events exposing (..)
+import Html.Attributes exposing (class, src, href)
+import Html.Events exposing (onClick)
 import Time exposing (Time, second)
+import String
 
 
 -- Model
@@ -29,6 +31,24 @@ type alias Model =
 
 
 
+-- Number of seconds for a normal relax mode
+
+
+relaxLimit : Int
+relaxLimit =
+    300
+
+
+
+-- Number of seconds for a normal focus mode
+
+
+focusLimit : Int
+focusLimit =
+    1500
+
+
+
 -- Update
 
 
@@ -37,6 +57,8 @@ type Msg
     | Start
     | Pause
     | Clear
+    | ElapsedMode
+    | RemainingMode
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -63,11 +85,18 @@ update msg model =
             , Cmd.none
             )
 
+        ElapsedMode ->
+            ( { model | timerMode = Elapsed }, Cmd.none )
+
+        RemainingMode ->
+            ( { model | timerMode = Remaining }, Cmd.none )
+
         Tick _ ->
             case
                 ( model.counting
                 , model.timerStatus
-                , model.seconds
+                , (model.seconds == focusLimit)
+                    || (model.seconds == relaxLimit)
                 )
             of
                 -- Not counting, so do nothing
@@ -75,7 +104,7 @@ update msg model =
                     ( model, Cmd.none )
 
                 -- Counting and the clock has struck 25 minutes in Focus
-                ( True, Focus, 1500 ) ->
+                ( True, Focus, True ) ->
                     ( model
                         |> flipStatus
                         |> zeroClock
@@ -83,7 +112,7 @@ update msg model =
                     )
 
                 -- Counting and clock has struck 5 minutes in Relax
-                ( True, Relax, 300 ) ->
+                ( True, Relax, True ) ->
                     ( model
                         |> flipStatus
                         |> zeroClock
@@ -92,9 +121,9 @@ update msg model =
                     )
 
                 -- Ordinary counting
-                ( True, _, s ) ->
+                ( True, _, False ) ->
                     ( model
-                        |> tickSecond s
+                        |> tickSecond model.seconds
                     , Cmd.none
                     )
 
@@ -146,14 +175,140 @@ markPomsCompleted model =
 view : Model -> Html Msg
 view model =
     div []
-        [ text "Ahoy world!"
-        , p [] [ text <| toString model.seconds ]
-        , br [] []
-        , button [ onClick Start ] [ text "Start" ]
-        , button [ onClick Pause ] [ text "Pause" ]
-        , button [ onClick Clear ] [ text "Clear" ]
+        [ makeHeader
+        , makeMainPage model
+        , makeFooter
+          --- Purely for sanity checking will be removed later
         , br [] []
         , p [] [ text <| toString model ]
+        ]
+
+
+makeMainPage : Model -> Html Msg
+makeMainPage model =
+    div []
+        [ makeClock model
+        , makeButtonCluster
+        ]
+
+
+makeButtonCluster : Html Msg
+makeButtonCluster =
+    div [ class "btncluster" ]
+        [ button [ onClick Start ] [ text "Start" ]
+        , button [ onClick Pause ] [ text "Pause" ]
+        , button [ onClick Clear ] [ text "Clear" ]
+        ]
+
+
+makeClock : Model -> Html Msg
+makeClock model =
+    div [ class "bezel" ]
+        [ div [ class "clock" ]
+            [ div [ statusChecker model.timerStatus ]
+                [ text <| toString model.timerStatus
+                ]
+            , div [ class "gauge" ]
+                [ text <| timeMaker model
+                ]
+            ]
+        , bezelButtonMaker "Elapsed" ElapsedMode model
+        , bezelButtonMaker "Remaining" RemainingMode model
+        ]
+
+
+timeMaker : Model -> String
+timeMaker model =
+    case ( model.timerMode, model.timerStatus, model.seconds ) of
+        ( Elapsed, _, s ) ->
+            getClockString s
+
+        ( Remaining, Relax, s ) ->
+            getClockString <| (relaxLimit - s)
+
+        ( Remaining, Focus, s ) ->
+            getClockString <| (focusLimit - s)
+
+
+getClockString : Int -> String
+getClockString sec =
+    let
+        formatter x =
+            if (String.length <| toString x) == 1 then
+                "0" ++ toString x
+            else
+                toString x
+
+        madeMinutes =
+            sec // 60
+
+        madeSeconds =
+            rem sec 60
+    in
+        formatter madeMinutes ++ " : " ++ formatter madeSeconds
+
+
+statusChecker : Status -> Html.Attribute Msg
+statusChecker status =
+    case status of
+        Relax ->
+            class "relaxgauge"
+
+        Focus ->
+            class "focusgauge"
+
+
+bezelButtonMaker : String -> Msg -> Model -> Html Msg
+bezelButtonMaker btnName msg model =
+    button
+        [ onClick msg, getBezelBtnClass btnName model ]
+        [ text btnName ]
+
+
+getBezelBtnClass : String -> Model -> Html.Attribute Msg
+getBezelBtnClass btnName model =
+    if btnName == (toString model.timerMode) then
+        class "activebezelbtn"
+    else
+        class "inactivebezelbtn"
+
+
+makeHeader : Html Msg
+makeHeader =
+    header []
+        [ div [ class "title" ]
+            [ h2 [] [ text "Work Relax Timer" ]
+            ]
+        ]
+
+
+makeFooter : Html Msg
+makeFooter =
+    footer []
+        [ div [ class "links" ] [ linkMaker ]
+        , div [ class "logo" ]
+            [ img [ src "Signature.JPG" ] []
+            ]
+        ]
+
+
+linkMaker : Html Msg
+linkMaker =
+    ul [] <| List.map linkRenderer getLinks
+
+
+getLinks : List ( String, String )
+getLinks =
+    [ ( "Medium", "https://medium.com/@NewMountain" )
+    , ( "Twitter", "https://twitter.com/@nyberg_c" )
+    , ( "GitHub", "https://github.com/NewMountain" )
+    ]
+
+
+linkRenderer : ( String, String ) -> Html Msg
+linkRenderer ( name, url' ) =
+    li []
+        [ a [ href url' ] [ text name ]
         ]
 
 
@@ -164,7 +319,7 @@ view model =
 init : ( Model, Cmd Msg )
 init =
     ( { counting = False
-      , timerStatus = Relax
+      , timerStatus = Focus
       , timerMode = Elapsed
       , seconds = 0
       , pomsCompleted = 0
