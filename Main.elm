@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Html exposing (..)
 import Html.App as App
+import Html.Events exposing (..)
 import Time exposing (Time, second)
 
 
@@ -33,12 +34,35 @@ type alias Model =
 
 type Msg
     = Tick Time
+    | Start
+    | Pause
+    | Clear
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         -- I don't care about the time, I just want the tick
+        Start ->
+            ( model
+                |> startCounting
+            , Cmd.none
+            )
+
+        Pause ->
+            ( model
+                |> stopCounting
+            , Cmd.none
+            )
+
+        Clear ->
+            ( model
+                |> stopCounting
+                |> zeroClock
+                |> resetPomsCompleted
+            , Cmd.none
+            )
+
         Tick _ ->
             case
                 ( model.counting
@@ -63,7 +87,7 @@ update msg model =
                     ( model
                         |> flipStatus
                         |> zeroClock
-                        |> markPomComplete
+                        |> markPomsCompleted
                     , Cmd.none
                     )
 
@@ -73,6 +97,21 @@ update msg model =
                         |> tickSecond s
                     , Cmd.none
                     )
+
+
+resetPomsCompleted : Model -> Model
+resetPomsCompleted model =
+    { model | pomsCompleted = 0 }
+
+
+stopCounting : Model -> Model
+stopCounting model =
+    { model | counting = False }
+
+
+startCounting : Model -> Model
+startCounting model =
+    { model | counting = True }
 
 
 tickSecond : Int -> Model -> Model
@@ -95,8 +134,8 @@ zeroClock model =
     { model | seconds = 0 }
 
 
-markPomComplete : Model -> Model
-markPomComplete model =
+markPomsCompleted : Model -> Model
+markPomsCompleted model =
     { model | pomsCompleted = model.pomsCompleted + 1 }
 
 
@@ -108,6 +147,12 @@ view : Model -> Html Msg
 view model =
     div []
         [ text "Ahoy world!"
+        , p [] [ text <| toString model.seconds ]
+        , br [] []
+        , button [ onClick Start ] [ text "Start" ]
+        , button [ onClick Pause ] [ text "Pause" ]
+        , button [ onClick Clear ] [ text "Clear" ]
+        , br [] []
         , p [] [ text <| toString model ]
         ]
 
